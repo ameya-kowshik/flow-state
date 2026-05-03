@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { useTimer } from '@/contexts/TimerContext'
 import { requestNotificationPermission } from '@/lib/audio'
 import { cn } from '@/lib/utils'
@@ -37,17 +37,6 @@ export default function SettingsPage() {
   })
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-
-  useEffect(() => {
-    setForm({
-      focusDuration: settings.focusDuration,
-      shortBreakDuration: settings.shortBreakDuration,
-      longBreakDuration: settings.longBreakDuration,
-      longBreakInterval: settings.longBreakInterval,
-      soundEnabled,
-      notificationsEnabled,
-    })
-  }, [settings, soundEnabled, notificationsEnabled])
 
   const handleDurationChange = useCallback(
     (field: keyof Pick<SettingsFormState, 'focusDuration' | 'shortBreakDuration' | 'longBreakDuration' | 'longBreakInterval'>) =>

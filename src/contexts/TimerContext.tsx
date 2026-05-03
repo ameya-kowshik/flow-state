@@ -362,9 +362,12 @@ export function TimerProvider({
   })
 
   // -------------------------------------------------------------------------
-  // Tick counter — incremented every second while running
+  // Tick counter — incremented every second while running.
+  // We store `now` (ms) alongside the tick so totalElapsed can be computed
+  // without calling Date.now() during render (which the React Compiler flags
+  // as an impure call).
   // -------------------------------------------------------------------------
-  const [tick, setTick] = useState(0)
+  const [now, setNow] = useState(() => Date.now())
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // -------------------------------------------------------------------------
@@ -377,11 +380,10 @@ export function TimerProvider({
 
   const totalElapsed = useMemo(() => {
     if (timerState.status === 'running' && timerState.startedAt !== null) {
-      return timerState.elapsed + (Date.now() - timerState.startedAt) / 1000
+      return timerState.elapsed + (now - timerState.startedAt) / 1000
     }
     return timerState.elapsed
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timerState.status, timerState.startedAt, timerState.elapsed, tick])
+  }, [timerState.status, timerState.startedAt, timerState.elapsed, now])
 
   const remainingSeconds = useMemo(() => {
     if (currentDuration === Infinity) return Infinity
@@ -389,16 +391,24 @@ export function TimerProvider({
   }, [currentDuration, totalElapsed])
 
   // -------------------------------------------------------------------------
-  // Ref to avoid stale closures in the interval callback
+  // Refs to avoid stale closures in the interval callback.
+  // Updated via useEffect (not during render) to satisfy the React Compiler.
   // -------------------------------------------------------------------------
   const stateRef = useRef(timerState)
-  stateRef.current = timerState
-
   const currentDurationRef = useRef(currentDuration)
-  currentDurationRef.current = currentDuration
-
   const totalElapsedRef = useRef(totalElapsed)
-  totalElapsedRef.current = totalElapsed
+
+  useEffect(() => {
+    stateRef.current = timerState
+  })
+
+  useEffect(() => {
+    currentDurationRef.current = currentDuration
+  })
+
+  useEffect(() => {
+    totalElapsedRef.current = totalElapsed
+  })
 
   // -------------------------------------------------------------------------
   // Phase-complete handler (called from tick effect)
@@ -482,7 +492,7 @@ export function TimerProvider({
   useEffect(() => {
     if (timerState.status === 'running') {
       intervalRef.current = setInterval(() => {
-        setTick((t) => t + 1)
+        setNow(Date.now())
 
         // Check for phase completion inside the interval using refs to avoid
         // stale closure over timerState.
@@ -692,7 +702,6 @@ export function TimerProvider({
       pendingSession,
       clearPendingSession,
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       timerState,
       currentDuration,

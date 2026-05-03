@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
  * GET /api/settings
  * Returns the current user's timer and notification settings.
  */
-export async function GET(_req: NextRequest) {
+export async function GET() {
   const session = await auth()
   if (!session?.user?.id) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
