@@ -44,6 +44,20 @@ export interface TimerState {
   cycleCount: number
 }
 
+/**
+ * Data captured at the moment a focus phase completes.
+ * Preserved in state until the session is successfully submitted.
+ */
+export interface CompletedSessionData {
+  sessionType: 'POMODORO' | 'STOPWATCH'
+  /** Duration in minutes */
+  duration: number
+  startedAt: Date
+  completedAt: Date
+  tagId: string | null
+  taskId: string | null
+}
+
 export interface TimerContextValue extends TimerState {
   start: () => void
   pause: () => void
@@ -63,6 +77,10 @@ export interface TimerContextValue extends TimerState {
   remainingSeconds: number
   /** elapsed + (running ? (Date.now() - startedAt) / 1000 : 0) */
   totalElapsed: number
+  /** Non-null when the Session Complete Modal should be shown */
+  pendingSession: CompletedSessionData | null
+  /** Called by SessionCompleteModal after a successful POST */
+  clearPendingSession: () => void
 }
 
 // ---------------------------------------------------------------------------
@@ -242,6 +260,8 @@ const TimerContext = createContext<TimerContextValue>({
   currentDuration: DEFAULT_SETTINGS.focusDuration * 60,
   remainingSeconds: DEFAULT_SETTINGS.focusDuration * 60,
   totalElapsed: 0,
+  pendingSession: null,
+  clearPendingSession: () => {},
 })
 
 export function useTimer(): TimerContextValue {
@@ -269,6 +289,15 @@ export function TimerProvider({
   initialSoundEnabled,
   initialNotificationsEnabled,
 }: TimerProviderProps) {
+  // -------------------------------------------------------------------------
+  // Pending session — set when a focus phase completes, cleared after submit
+  // -------------------------------------------------------------------------
+  const [pendingSession, setPendingSession] = useState<CompletedSessionData | null>(null)
+
+  const clearPendingSession = useCallback(() => {
+    setPendingSession(null)
+  }, [])
+
   // -------------------------------------------------------------------------
   // Core timer state
   // -------------------------------------------------------------------------
@@ -378,7 +407,21 @@ export function TimerProvider({
     const state = stateRef.current
 
     if (state.mode === 'stopwatch') {
-      // Stopwatch reached max duration — stop.
+      // Stopwatch reached max duration — stop and show modal.
+      const completedAt = new Date()
+      const durationMinutes = Math.round(currentDurationRef.current / 60)
+      const startedAtMs =
+        state.startedAt !== null
+          ? state.startedAt
+          : Date.now() - currentDurationRef.current * 1000
+      setPendingSession({
+        sessionType: 'STOPWATCH',
+        duration: Math.max(1, durationMinutes),
+        startedAt: new Date(startedAtMs),
+        completedAt,
+        tagId: state.selectedTagId,
+        taskId: state.selectedTaskId,
+      })
       setTimerState((prev) => ({
         ...prev,
         status: 'idle',
@@ -403,6 +446,24 @@ export function TimerProvider({
     }
     if (state.notificationsEnabled) {
       sendPhaseNotification(nextPhase)
+    }
+
+    // If a focus phase just completed, capture session data for the modal.
+    if (state.phase === 'focus') {
+      const completedAt = new Date()
+      const durationMinutes = Math.round(state.settings.focusDuration)
+      const startedAtMs =
+        state.startedAt !== null
+          ? state.startedAt
+          : Date.now() - state.settings.focusDuration * 60 * 1000
+      setPendingSession({
+        sessionType: 'POMODORO',
+        duration: Math.max(1, durationMinutes),
+        startedAt: new Date(startedAtMs),
+        completedAt,
+        tagId: state.selectedTagId,
+        taskId: state.selectedTaskId,
+      })
     }
 
     setTimerState((prev) => ({
@@ -628,6 +689,8 @@ export function TimerProvider({
       currentDuration,
       remainingSeconds,
       totalElapsed,
+      pendingSession,
+      clearPendingSession,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
@@ -635,6 +698,7 @@ export function TimerProvider({
       currentDuration,
       remainingSeconds,
       totalElapsed,
+      pendingSession,
       // Actions are stable (useCallback with no deps), so listing them here
       // doesn't cause extra renders but keeps the linter happy.
       start,
@@ -649,6 +713,7 @@ export function TimerProvider({
       setNotificationsEnabled,
       setSelectedTagId,
       setSelectedTaskId,
+      clearPendingSession,
     ],
   )
 

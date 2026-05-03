@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { TimerProvider } from '@/contexts/TimerContext'
 import { Sidebar } from '@/components/sidebar/Sidebar'
 import { FloatingWidget } from '@/components/timer/FloatingWidget'
+import { SessionCompleteModal } from '@/components/timer/SessionCompleteModal'
 
 /**
  * (app) layout — Server Component.
@@ -80,6 +81,7 @@ export default async function AppLayout({
           {children}
         </main>
         <FloatingWidget />
+        <SessionCompleteModal />
       </div>
     </TimerProvider>
   )
