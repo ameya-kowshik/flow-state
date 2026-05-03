@@ -1,0 +1,248 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum SessionType {
+  POMODORO
+  STOPWATCH
+}
+
+enum CardStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+  CANCELLED
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id                    String    @id @default(cuid())
+  email                 String    @unique
+  name                  String?
+  image                 String?
+  googleId              String?   @unique
+  lastSeenAt            DateTime?
+
+  // Timer / Pomodoro settings
+  focusDuration         Int       @default(25)
+  shortBreakDuration    Int       @default(5)
+  longBreakDuration     Int       @default(15)
+  longBreakInterval     Int       @default(4)
+  maxStopwatchDuration  Int?
+
+  // Notification settings
+  soundEnabled          Boolean   @default(true)
+  notificationsEnabled  Boolean   @default(false)
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  pomodoroLogs          PomodoroLog[]
+  tags                  Tag[]
+  boards                Board[]
+  comments              Comment[]
+  cardActivities        CardActivity[]
+}
+
+model PomodoroLog {
+  id           String      @id @default(cuid())
+  userId       String
+  tagId        String?
+  taskId       String?
+  sessionType  SessionType
+  duration     Int         // minutes
+  startedAt    DateTime
+  completedAt  DateTime
+  focusScore   Int?        // 1–10
+  notes        String?
+  createdAt    DateTime    @default(now())
+
+  // Relations
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tag          Tag?        @relation(fields: [tagId], references: [id], onDelete: SetNull)
+  task         Card?       @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([tagId])
+  @@index([taskId])
+  @@index([completedAt])
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  color     String   // hex color e.g. "#FF5733"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pomodoroLogs PomodoroLog[]
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model Board {
+  id         String   @id @default(cuid())
+  userId     String
+  name       String
+  color      String
+  isStarred  Boolean  @default(false)
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  columns Column[]
+  cards   Card[]
+  labels  Label[]
+
+  @@index([userId])
+  @@index([userId, isArchived])
+  @@index([userId, isStarred])
+}
+
+model Column {
+  id          String   @id @default(cuid())
+  boardId     String
+  name        String
+  position    Float
+  cardLimit   Int?
+  isCollapsed Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  board Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  cards Card[]
+
+  @@index([boardId])
+  @@index([boardId, position])
+}
+
+model Card {
+  id                 String     @id @default(cuid())
+  columnId           String
+  boardId            String
+  title              String
+  description        String?
+  status             CardStatus @default(TODO)
+  position           Float
+  dueDate            DateTime?
+  estimatedMinutes   Int?
+  actualMinutes      Int        @default(0)
+  completedPomodoros Int        @default(0)
+  isArchived         Boolean    @default(false)
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  // Relations
+  column       Column        @relation(fields: [columnId], references: [id], onDelete: Cascade)
+  board        Board         @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  subtasks     Subtask[]
+  labels       CardLabel[]
+  comments     Comment[]
+  activities   CardActivity[]
+  pomodoroLogs PomodoroLog[]
+
+  @@index([columnId])
+  @@index([boardId])
+  @@index([columnId, position])
+  @@index([boardId, isArchived])
+  @@index([status])
+  @@index([dueDate])
+}
+
+model Subtask {
+  id          String   @id @default(cuid())
+  cardId      String
+  title       String
+  isCompleted Boolean  @default(false)
+  position    Float
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId])
+  @@index([cardId, position])
+}
+
+model Label {
+  id        String   @id @default(cuid())
+  boardId   String
+  name      String
+  color     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  board Board       @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  cards CardLabel[]
+
+  @@index([boardId])
+}
+
+model CardLabel {
+  cardId  String
+  labelId String
+
+  // Relations
+  card  Card  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  label Label @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([cardId, labelId])
+  @@index([cardId])
+  @@index([labelId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  cardId    String
+  userId    String
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([cardId])
+  @@index([userId])
+}
+
+model CardActivity {
+  id        String   @id @default(cuid())
+  cardId    String
+  userId    String
+  field     String
+  oldValue  String?
+  newValue  String?
+  createdAt DateTime @default(now())
+
+  // Relations
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([cardId])
+  @@index([userId])
+  @@index([cardId, createdAt])
+}
