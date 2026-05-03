@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { TimerDisplay } from '@/components/timer/TimerDisplay'
+import { TagSelector } from '@/components/tags/TagSelector'
 import { useTimer } from '@/contexts/TimerContext'
 import { cn } from '@/lib/utils'
-import { Settings2, Tag, ChevronDown } from 'lucide-react'
+import { Settings2 } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
 // Settings panel
@@ -107,125 +108,6 @@ function DurationField({
         />
         <span className="text-xs text-[oklch(0.45_0.03_265)]">{unit}</span>
       </div>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Tag selector stub
-// ---------------------------------------------------------------------------
-
-// Stub tag list — replaced in Phase 3 when the Tags API is implemented.
-const STUB_TAGS = [
-  { id: 'deep-work',  name: 'Deep work',  color: '#a78bfa' },
-  { id: 'learning',   name: 'Learning',   color: '#34d399' },
-  { id: 'admin',      name: 'Admin',      color: '#fb923c' },
-  { id: 'planning',   name: 'Planning',   color: '#60a5fa' },
-]
-
-function TagSelector() {
-  const { selectedTagId, setSelectedTagId } = useTimer()
-  const [open, setOpen] = useState(false)
-
-  const selected = STUB_TAGS.find((t) => t.id === selectedTagId) ?? null
-
-  const toggle = useCallback(() => setOpen((v) => !v), [])
-
-  const pick = useCallback(
-    (id: string | null) => {
-      setSelectedTagId(id)
-      setOpen(false)
-    },
-    [setSelectedTagId],
-  )
-
-  return (
-    <div className="relative w-full">
-      <button
-        type="button"
-        onClick={toggle}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        className={cn(
-          'flex w-full items-center gap-2 rounded-xl border px-4 py-2.5 text-sm',
-          'transition-colors duration-150',
-          open
-            ? 'border-violet-500/40 bg-white/8 text-white'
-            : 'border-white/8 bg-white/4 text-[oklch(0.56_0.04_265)] hover:bg-white/6 hover:text-[oklch(0.88_0.01_265)]',
-        )}
-      >
-        <Tag className="size-4 shrink-0" aria-hidden="true" />
-        <span className="flex-1 text-left">
-          {selected ? (
-            <span className="flex items-center gap-2">
-              <span
-                className="size-2.5 rounded-full shrink-0"
-                style={{ backgroundColor: selected.color }}
-                aria-hidden="true"
-              />
-              {selected.name}
-            </span>
-          ) : (
-            'Select a tag'
-          )}
-        </span>
-        <ChevronDown
-          className={cn('size-4 shrink-0 transition-transform duration-150', open && 'rotate-180')}
-          aria-hidden="true"
-        />
-      </button>
-
-      {open && (
-        <ul
-          role="listbox"
-          aria-label="Tags"
-          className={cn(
-            'absolute z-20 mt-1 w-full rounded-xl border border-white/10',
-            'bg-[oklch(0.14_0.025_265)] py-1 shadow-xl shadow-black/40',
-          )}
-        >
-          <li>
-            <button
-              role="option"
-              aria-selected={selectedTagId === null}
-              onClick={() => pick(null)}
-              className={cn(
-                'flex w-full items-center gap-2 px-4 py-2 text-sm',
-                'transition-colors hover:bg-white/6',
-                selectedTagId === null
-                  ? 'text-violet-300'
-                  : 'text-[oklch(0.56_0.04_265)]',
-              )}
-            >
-              <span className="size-2.5 rounded-full border border-white/20 shrink-0" aria-hidden="true" />
-              No tag
-            </button>
-          </li>
-          {STUB_TAGS.map((tag) => (
-            <li key={tag.id}>
-              <button
-                role="option"
-                aria-selected={selectedTagId === tag.id}
-                onClick={() => pick(tag.id)}
-                className={cn(
-                  'flex w-full items-center gap-2 px-4 py-2 text-sm',
-                  'transition-colors hover:bg-white/6',
-                  selectedTagId === tag.id
-                    ? 'text-white'
-                    : 'text-[oklch(0.88_0.01_265)]',
-                )}
-              >
-                <span
-                  className="size-2.5 rounded-full shrink-0"
-                  style={{ backgroundColor: tag.color }}
-                  aria-hidden="true"
-                />
-                {tag.name}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   )
 }

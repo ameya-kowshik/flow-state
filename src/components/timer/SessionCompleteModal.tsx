@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { useTimer } from '@/contexts/TimerContext'
+import { TagSelector } from '@/components/tags/TagSelector'
 import { cn } from '@/lib/utils'
 import { CheckCircle, AlertCircle, Loader2, Star } from 'lucide-react'
 
@@ -15,7 +16,7 @@ import { CheckCircle, AlertCircle, Loader2, Star } from 'lucide-react'
 // Requirements: 3.10, 3.11, 6.1, 6.5, 16.2, 16.3
 
 export function SessionCompleteModal() {
-  const { pendingSession, clearPendingSession } = useTimer()
+  const { pendingSession, clearPendingSession, selectedTagId } = useTimer()
 
   const [focusScore, setFocusScore] = useState<number | null>(null)
   const [notes, setNotes] = useState('')
@@ -39,7 +40,7 @@ export function SessionCompleteModal() {
           completedAt: pendingSession.completedAt.toISOString(),
           focusScore: focusScore ?? undefined,
           notes: notes.trim() || undefined,
-          tagId: pendingSession.tagId ?? undefined,
+          tagId: selectedTagId ?? undefined,
           taskId: pendingSession.taskId ?? undefined,
         }),
       })
@@ -64,7 +65,7 @@ export function SessionCompleteModal() {
       setErrorMessage('Network error — please try again.')
       setSubmitStatus('error')
     }
-  }, [pendingSession, focusScore, notes, clearPendingSession])
+  }, [pendingSession, focusScore, notes, selectedTagId, clearPendingSession])
 
   const handleSkip = useCallback(() => {
     clearPendingSession()
@@ -125,6 +126,17 @@ export function SessionCompleteModal() {
 
         {/* Body */}
         <div className="flex flex-col gap-5 px-6 pb-6">
+          {/* Tag selector */}
+          <div>
+            <label className="mb-2 block text-sm font-medium text-[oklch(0.88_0.01_265)]">
+              Tag
+              <span className="ml-1 text-xs font-normal text-[oklch(0.45_0.03_265)]">
+                (optional)
+              </span>
+            </label>
+            <TagSelector />
+          </div>
+
           {/* Focus score */}
           <div>
             <label className="mb-2 block text-sm font-medium text-[oklch(0.88_0.01_265)]">
