@@ -49,5 +49,8 @@ next-env.d.ts
 AGENTS.md
 CLAUDE.md
 
+# kiro IDE files
+.kiro/
+
 
 focus-app-features.md
