@@ -5,6 +5,9 @@ import { TimerProvider } from '@/contexts/TimerContext'
 import { Sidebar } from '@/components/sidebar/Sidebar'
 import { FloatingWidget } from '@/components/timer/FloatingWidget'
 import { SessionCompleteModal } from '@/components/timer/SessionCompleteModal'
+import { ToastProvider } from '@/components/ui/toast'
+import { CommandPaletteProvider } from '@/contexts/CommandPaletteContext'
+import { CommandPaletteShell } from '@/components/CommandPaletteShell'
 
 /**
  * (app) layout — Server Component.
@@ -61,28 +64,33 @@ export default async function AppLayout({
   }
 
   return (
-    <TimerProvider
-      initialSettings={
-        userSettings
-          ? {
-              focusDuration: userSettings.focusDuration,
-              shortBreakDuration: userSettings.shortBreakDuration,
-              longBreakDuration: userSettings.longBreakDuration,
-              longBreakInterval: userSettings.longBreakInterval,
-            }
-          : undefined
-      }
-      initialSoundEnabled={userSettings?.soundEnabled}
-      initialNotificationsEnabled={userSettings?.notificationsEnabled}
-    >
-      <div className="flex h-full min-h-screen">
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto">
-          {children}
-        </main>
-        <FloatingWidget />
-        <SessionCompleteModal />
-      </div>
-    </TimerProvider>
+    <ToastProvider>
+      <CommandPaletteProvider>
+        <TimerProvider
+          initialSettings={
+            userSettings
+              ? {
+                  focusDuration: userSettings.focusDuration,
+                  shortBreakDuration: userSettings.shortBreakDuration,
+                  longBreakDuration: userSettings.longBreakDuration,
+                  longBreakInterval: userSettings.longBreakInterval,
+                }
+              : undefined
+          }
+          initialSoundEnabled={userSettings?.soundEnabled}
+          initialNotificationsEnabled={userSettings?.notificationsEnabled}
+        >
+          <div className="flex h-full min-h-screen">
+            <Sidebar />
+            <main className="flex-1 overflow-y-auto">
+              {children}
+            </main>
+            <FloatingWidget />
+            <SessionCompleteModal />
+            <CommandPaletteShell />
+          </div>
+        </TimerProvider>
+      </CommandPaletteProvider>
+    </ToastProvider>
   )
 }

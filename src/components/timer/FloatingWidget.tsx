@@ -4,6 +4,7 @@ import { useTimer } from '@/contexts/TimerContext'
 import { cn } from '@/lib/utils'
 import { Timer } from 'lucide-react'
 import type { TimerPhase } from '@/contexts/TimerContext'
+import { useEffect, useRef, useState } from 'react'
 
 function formatTime(seconds: number): string {
   if (!isFinite(seconds)) return '∞'
@@ -23,9 +24,48 @@ const PHASE_COLORS: Record<TimerPhase | 'stopwatch', string> = {
 /**
  * FloatingWidget — bottom-right fixed overlay.
  * Visible only when timer is running or paused (Requirements 2.4, 2.5).
+ * Displays the linked card title when selectedTaskId is set (Requirements 16.4, 16.5).
  */
 export function FloatingWidget() {
-  const { status, mode, phase, remainingSeconds, totalElapsed } = useTimer()
+  const { status, mode, phase, remainingSeconds, totalElapsed, selectedTaskId } = useTimer()
+
+  // Cache of taskId → title to avoid redundant fetches
+  const titleCacheRef = useRef<Map<string, string>>(new Map())
+  const [linkedCardTitle, setLinkedCardTitle] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!selectedTaskId) {
+      setLinkedCardTitle(null)
+      return
+    }
+
+    // Return cached value immediately if available
+    const cached = titleCacheRef.current.get(selectedTaskId)
+    if (cached !== undefined) {
+      setLinkedCardTitle(cached)
+      return
+    }
+
+    let cancelled = false
+
+    fetch(`/api/cards/${selectedTaskId}`)
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to fetch card')
+        return res.json() as Promise<{ title: string }>
+      })
+      .then((data) => {
+        if (cancelled) return
+        titleCacheRef.current.set(selectedTaskId, data.title)
+        setLinkedCardTitle(data.title)
+      })
+      .catch(() => {
+        if (!cancelled) setLinkedCardTitle(null)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedTaskId])
 
   if (status !== 'running' && status !== 'paused') return null
 
@@ -72,6 +112,15 @@ export function FloatingWidget() {
       <span className="text-xs text-[oklch(0.45_0.03_265)]">
         {phaseLabel}
       </span>
+
+      {linkedCardTitle && (
+        <span
+          className="max-w-[140px] truncate text-xs text-[oklch(0.72_0.04_265)]"
+          title={linkedCardTitle}
+        >
+          {linkedCardTitle}
+        </span>
+      )}
 
       {status === 'paused' && (
         <span className="rounded-md bg-white/6 px-1.5 py-0.5 text-[10px] font-medium text-[oklch(0.56_0.04_265)]">

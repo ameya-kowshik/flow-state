@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { TimerDisplay } from '@/components/timer/TimerDisplay'
 import { TagSelector } from '@/components/tags/TagSelector'
+import { TaskPicker } from '@/components/timer/TaskPicker'
 import { useTimer } from '@/contexts/TimerContext'
 import { cn } from '@/lib/utils'
 import { Settings2 } from 'lucide-react'
@@ -126,6 +127,12 @@ export default function FocusPage() {
 
       {/* Controls row: tag selector + settings toggle */}
       <div className="flex w-full max-w-sm flex-col gap-3">
+        {/* Task picker */}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-[oklch(0.45_0.03_265)]">Task</span>
+          <TaskPicker />
+        </div>
+
         {/* Tag selector */}
         <div className="flex flex-col gap-1.5">
           <span className="text-xs font-medium text-[oklch(0.45_0.03_265)]">Tag</span>
