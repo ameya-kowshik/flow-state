@@ -20,11 +20,12 @@ import {
   computeEstimatedVsActual,
 } from '@/lib/analytics'
 import { CalendarHeatmap } from '@/components/analytics/CalendarHeatmap'
+import { CalendarView } from '@/components/analytics/CalendarView'
 import { DonutChart } from '@/components/analytics/DonutChart'
 import { SessionTimeline } from '@/components/analytics/SessionTimeline'
 import { BarChart } from '@/components/analytics/BarChart'
 import { LineChart } from '@/components/analytics/LineChart'
-import type { PomodoroLog, Tag } from '@/generated/prisma/client'
+import type { PomodoroLog, Tag, Card } from '@/generated/prisma/client'
 import { cn } from '@/lib/utils'
 
 // ---------------------------------------------------------------------------
@@ -38,16 +39,20 @@ interface AnalyticsCard {
   completedPomodoros: number
 }
 
+// Card type for calendar view (needs board/status/due date context)
+type CalendarCard = Pick<Card, 'id' | 'title' | 'status' | 'dueDate' | 'isArchived' | 'boardId'>
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type TabId = 'overview' | 'day' | 'week' | 'month' | 'year'
+type TabId = 'overview' | 'day' | 'week' | 'month' | 'year' | 'calendar'
 
 interface FetchState {
   logs: PomodoroLog[]
   tags: Tag[]
   cards: AnalyticsCard[]
+  calendarCards: CalendarCard[]
   loading: boolean
   error: string | null
 }
@@ -176,11 +181,12 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
 // ---------------------------------------------------------------------------
 
 const TABS: { id: TabId; label: string }[] = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'day',      label: 'Day' },
-  { id: 'week',     label: 'Week' },
-  { id: 'month',    label: 'Month' },
-  { id: 'year',     label: 'Year' },
+  { id: 'overview',  label: 'Overview' },
+  { id: 'day',       label: 'Day' },
+  { id: 'week',      label: 'Week' },
+  { id: 'month',     label: 'Month' },
+  { id: 'year',      label: 'Year' },
+  { id: 'calendar',  label: 'Calendar' },
 ]
 
 function TabBar({ active, onChange }: { active: TabId; onChange: (t: TabId) => void }) {
@@ -849,6 +855,7 @@ export default function AnalyticsPage() {
     logs: [],
     tags: [],
     cards: [],
+    calendarCards: [],
     loading: true,
     error: null,
   })
@@ -856,11 +863,12 @@ export default function AnalyticsPage() {
   const fetchData = useCallback(async () => {
     setState((s) => ({ ...s, loading: true, error: null }))
     try {
-      // Fetch all sessions (up to 1000), all tags, and analytics cards in parallel
-      const [sessionsRes, tagsRes, cardsRes] = await Promise.all([
+      // Fetch all sessions (up to 1000), all tags, analytics cards, and calendar cards in parallel
+      const [sessionsRes, tagsRes, cardsRes, calendarCardsRes] = await Promise.all([
         fetch('/api/focus-sessions?pageSize=1000'),
         fetch('/api/tags'),
         fetch('/api/cards/analytics'),
+        fetch('/api/cards/calendar'),
       ])
 
       if (!sessionsRes.ok) throw new Error(`Sessions fetch failed: ${sessionsRes.status}`)
@@ -870,11 +878,13 @@ export default function AnalyticsPage() {
       const sessionsJson = await sessionsRes.json()
       const tagsJson = await tagsRes.json()
       const cardsJson = await cardsRes.json()
+      const calendarCardsJson = calendarCardsRes.ok ? await calendarCardsRes.json() : []
 
       setState({
         logs: sessionsJson.data ?? [],
         tags: tagsJson ?? [],
         cards: cardsJson ?? [],
+        calendarCards: calendarCardsJson ?? [],
         loading: false,
         error: null,
       })
@@ -917,11 +927,18 @@ export default function AnalyticsPage() {
         <>
           <TabBar active={activeTab} onChange={setActiveTab} />
 
-          {activeTab === 'overview' && <OverviewTab logs={state.logs} tags={state.tags} cards={state.cards} />}
-          {activeTab === 'day'      && <DayTab      logs={state.logs} tags={state.tags} cards={state.cards} />}
-          {activeTab === 'week'     && <WeekTab     logs={state.logs} tags={state.tags} cards={state.cards} />}
-          {activeTab === 'month'    && <MonthTab    logs={state.logs} tags={state.tags} cards={state.cards} />}
-          {activeTab === 'year'     && <YearTab     logs={state.logs} tags={state.tags} cards={state.cards} />}
+          {activeTab === 'overview'  && <OverviewTab  logs={state.logs} tags={state.tags} cards={state.cards} />}
+          {activeTab === 'day'       && <DayTab       logs={state.logs} tags={state.tags} cards={state.cards} />}
+          {activeTab === 'week'      && <WeekTab      logs={state.logs} tags={state.tags} cards={state.cards} />}
+          {activeTab === 'month'     && <MonthTab     logs={state.logs} tags={state.tags} cards={state.cards} />}
+          {activeTab === 'year'      && <YearTab      logs={state.logs} tags={state.tags} cards={state.cards} />}
+          {activeTab === 'calendar'  && (
+            <CalendarView
+              logs={state.logs}
+              tags={state.tags}
+              cards={state.calendarCards}
+            />
+          )}
         </>
       )}
     </div>

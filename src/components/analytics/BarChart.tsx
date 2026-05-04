@@ -92,10 +92,10 @@ export function BarChart({
         style={{ height }}
       >
         {/* Y-axis grid lines and labels */}
-        {yTicks.map((tick) => {
+        {yTicks.map((tick, i) => {
           const y = PADDING_TOP + chartHeight - (tick / computedMax) * chartHeight
           return (
-            <g key={tick}>
+            <g key={i}>
               <line
                 x1={PADDING_LEFT}
                 y1={y}

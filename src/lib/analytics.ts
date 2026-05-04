@@ -8,7 +8,7 @@
  * Requirements: 7.1, 7.2, 8.1, 8.2, 9.1, 9.2, 10.1, 10.2, 10.3, 11.1, 11.2
  */
 
-import type { PomodoroLog, Tag } from '@/generated/prisma/client'
+import type { Card, PomodoroLog, Tag } from '@/generated/prisma/client'
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -551,4 +551,151 @@ export function computeEstimatedVsActual(
       differenceMinutes: (c.estimatedMinutes as number) - c.actualMinutes,
     }))
     .sort((a, b) => b.actualMinutes - a.actualMinutes)
+}
+
+// ---------------------------------------------------------------------------
+// computeCalendarMonthView
+// ---------------------------------------------------------------------------
+
+/**
+ * A single day cell in the calendar month grid.
+ */
+export interface CalendarDayCell {
+  /** ISO date string YYYY-MM-DD */
+  date: string
+  /** Day of month (1–31) */
+  day: number
+  /** Whether this cell belongs to the requested month (false for padding days) */
+  isCurrentMonth: boolean
+  /** Total focus minutes for this day */
+  minutes: number
+  /** Sessions completed on this day */
+  sessions: PomodoroLog[]
+  /** Non-archived cards whose dueDate falls on this day */
+  dueCards: Pick<Card, 'id' | 'title' | 'status' | 'dueDate'>[]
+}
+
+/**
+ * A week row in the calendar month grid (always 7 days, Sun–Sat).
+ */
+export interface CalendarWeekRow {
+  days: CalendarDayCell[]
+}
+
+/**
+ * The full calendar month view result.
+ */
+export interface CalendarMonthView {
+  year: number
+  /** 1-indexed month */
+  month: number
+  /** Weeks array — typically 4–6 rows, each with 7 CalendarDayCell entries */
+  weeks: CalendarWeekRow[]
+  /** Total focus minutes for the month */
+  totalMinutes: number
+  /** Total session count for the month */
+  sessionCount: number
+}
+
+/**
+ * Build a calendar month grid (weeks × days) for the given year/month.
+ *
+ * Each day cell contains:
+ * - The sessions completed on that day
+ * - The cards whose dueDate falls on that day
+ * - Total focus minutes for that day
+ *
+ * The grid is padded with days from the previous and next months so that
+ * every row has exactly 7 cells (Sunday = index 0, Saturday = index 6).
+ * Padding cells have `isCurrentMonth: false`.
+ *
+ * Requirements: 7.2
+ */
+export function computeCalendarMonthView(
+  logs: PomodoroLog[],
+  cards: Pick<Card, 'id' | 'title' | 'status' | 'dueDate' | 'isArchived'>[],
+  year: number,
+  month: number, // 1-indexed
+): CalendarMonthView {
+  // --- Build lookup: date string → sessions ---
+  const sessionsByDay = new Map<string, PomodoroLog[]>()
+  for (const log of logs) {
+    const dateStr = toDateString(new Date(log.completedAt))
+    const existing = sessionsByDay.get(dateStr)
+    if (existing) {
+      existing.push(log)
+    } else {
+      sessionsByDay.set(dateStr, [log])
+    }
+  }
+
+  // --- Build lookup: date string → due cards ---
+  const cardsByDay = new Map<string, Pick<Card, 'id' | 'title' | 'status' | 'dueDate'>[]>()
+  for (const card of cards) {
+    if (card.isArchived || !card.dueDate) continue
+    const dateStr = toDateString(new Date(card.dueDate))
+    const existing = cardsByDay.get(dateStr)
+    const entry = { id: card.id, title: card.title, status: card.status, dueDate: card.dueDate }
+    if (existing) {
+      existing.push(entry)
+    } else {
+      cardsByDay.set(dateStr, [entry])
+    }
+  }
+
+  // --- Determine grid bounds ---
+  // First day of the month
+  const firstOfMonth = new Date(year, month - 1, 1)
+  // Last day of the month
+  const lastOfMonth = new Date(year, month, 0)
+
+  // Start the grid on the Sunday on or before the first of the month
+  const gridStart = new Date(firstOfMonth)
+  gridStart.setDate(gridStart.getDate() - gridStart.getDay()) // rewind to Sunday
+
+  // End the grid on the Saturday on or after the last of the month
+  const gridEnd = new Date(lastOfMonth)
+  const daysUntilSaturday = (6 - gridEnd.getDay() + 7) % 7
+  gridEnd.setDate(gridEnd.getDate() + daysUntilSaturday)
+
+  // --- Build cells ---
+  const weeks: CalendarWeekRow[] = []
+  const cursor = new Date(gridStart)
+
+  let totalMinutes = 0
+  let sessionCount = 0
+
+  while (cursor <= gridEnd) {
+    const weekDays: CalendarDayCell[] = []
+
+    for (let d = 0; d < 7; d++) {
+      const dateStr = toDateString(cursor)
+      const isCurrentMonth =
+        cursor.getFullYear() === year && cursor.getMonth() + 1 === month
+
+      const daySessions = sessionsByDay.get(dateStr) ?? []
+      const dayMinutes = daySessions.reduce((sum, log) => sum + log.duration, 0)
+      const dueCards = cardsByDay.get(dateStr) ?? []
+
+      if (isCurrentMonth) {
+        totalMinutes += dayMinutes
+        sessionCount += daySessions.length
+      }
+
+      weekDays.push({
+        date: dateStr,
+        day: cursor.getDate(),
+        isCurrentMonth,
+        minutes: dayMinutes,
+        sessions: daySessions,
+        dueCards,
+      })
+
+      cursor.setDate(cursor.getDate() + 1)
+    }
+
+    weeks.push({ days: weekDays })
+  }
+
+  return { year, month, weeks, totalMinutes, sessionCount }
 }
